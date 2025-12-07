@@ -1,0 +1,33 @@
+class TraderLlamaConfig:
+    def __init__(self, 
+        model_name: str ="trader-llama-base",
+        attention_bias: bool = False,
+        attention_dropout: float = 0.0,
+        bos_token_id: int = 128000,
+        eos_token_id: int = 128001,
+        hidden_activation: str = "silu",
+        hidden_size: int = 4096,
+        intermediate_size: int = 14336,
+        max_position_embeddings: int = 131072,
+        mlp_bias: bool = False,
+        num_attention_heads: int = 32,
+        num_hidden_layers: int = 32,
+        num_key_value_heads: int = 8,
+        rms_norm_eps: float = 1e-05,
+        vocab_size: int = 128256,
+        ):
+        self.model_name = model_name
+        self.attention_bias = attention_bias
+        self.attention_dropout = attention_dropout
+        self.bos_token_id = bos_token_id
+        self.eos_token_id = eos_token_id
+        self.hidden_activation = hidden_activation
+        self.hidden_size = hidden_size
+        self.intermediate_size = intermediate_size
+        self.max_position_embeddings = max_position_embeddings
+        self.mlp_bias = mlp_bias
+        self.num_attention_heads = num_attention_heads
+        self.num_hidden_layers = num_hidden_layers
+        self.num_key_value_heads = num_key_value_heads
+        self.rms_norm_eps = rms_norm_eps
+        self.vocab_size = vocab_size
