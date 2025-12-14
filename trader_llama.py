@@ -71,10 +71,15 @@ class TraderLlama(nn.Module):
 class TraderLlamaForCausalLM(nn.Module):
     def __init__(self, config: TraderLlamaConfig):
         super().__init__()
+        self.config = config
         self.trader_llama = TraderLlama(config)
         self.lm_head = nn.Linear(
             config.hidden_size, config.vocab_size, bias=False
         )
+
+        # Tie word embeddings if configured
+        if config.tie_word_embeddings:
+            self.lm_head.weight = self.trader_llama.embed_tokens.weight
 
     def forward(
         self,

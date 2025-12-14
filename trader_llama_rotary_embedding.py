@@ -11,7 +11,7 @@ class TraderLlamaRotaryEmbedding(nn.Module):
 
     def get_sin_cos(self, seq_len, device):
         t = torch.arange(seq_len, device=device)
-        freqs = torch.einsum("n,d->nd", t, self.inv_freq)
+        freqs = torch.einsum("n,d->nd", t, self.inv_freq.to(device))
         emb = torch.cat([freqs, freqs], dim=-1)
         sin = emb.sin()[None, None, :, :]
         cos = emb.cos()[None, None, :, :]

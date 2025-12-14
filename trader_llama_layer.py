@@ -40,7 +40,7 @@ class TraderLlamaLayer(nn.Module):
     def forward(self, x, rotary_emb, past_key_value=None, use_cache=False):
         # Attention block
         normed_x = self.input_layernorm(x)
-        attn_output, new_past_key_value = self.self_attn(normed_x, rotary_emb,  kv_cache = past_key_value, use_cache=use_cache)
+        attn_output, new_past_key_value = self.self_attn(normed_x, rotary_emb=rotary_emb, kv_cache=past_key_value, use_cache=use_cache)
         x = x + attn_output
 
         # MLP block
@@ -54,7 +54,7 @@ class TraderLlamaMLP(nn.Module):
     def __init__(self, config: TraderLlamaConfig):
         super(TraderLlamaMLP, self).__init__()
         self.gate_proj = nn.Linear(config.hidden_size, config.intermediate_size, bias=config.mlp_bias)
-        self.up_proj_proj = nn.Linear(config.hidden_size, config.intermediate_size, bias=config.mlp_bias)
+        self.up_proj = nn.Linear(config.hidden_size, config.intermediate_size, bias=config.mlp_bias)
         self.down_proj = nn.Linear(config.intermediate_size, config.hidden_size, bias=config.mlp_bias)
         if config.hidden_activation == "silu":
             self.act_fn = nn.SiLU()
@@ -63,7 +63,7 @@ class TraderLlamaMLP(nn.Module):
 
     def forward(self, x):
         gate_output = self.gate_proj(x)
-        up_proj_output = self.up_proj_proj(x)
+        up_proj_output = self.up_proj(x)
         return self.down_proj(self.act_fn(gate_output) * up_proj_output)
     
 class TraderLlamaAttention(nn.Module):
@@ -76,9 +76,8 @@ class TraderLlamaAttention(nn.Module):
         assert (self.head_dim * self.num_heads == self.embed_dim), "embed_dim must be divisible by num_heads"
         self.scale = 1 / (self.head_dim ** 0.5)
         self.num_kv_heads = config.num_key_value_heads
-        self.rotary_dim = config.rotary_dim if config.rotary_dim > 0 else self.head_dim
+        self.rotary_dim =  self.head_dim
         self.dropout = config.attention_dropout
-        self.training = config.training
 
         self.q_proj = nn.Linear(self.embed_dim, self.embed_dim, bias=False)
         self.k_proj = nn.Linear(self.embed_dim, self.num_kv_heads * self.head_dim, bias=False)
@@ -144,6 +143,11 @@ class TraderLlamaAttention(nn.Module):
         # ---- Attention ----
         scale = 1.0 / math.sqrt(self.head_dim)
         attn_scores = torch.matmul(q, k.transpose(-2, -1)) * scale
+
+        # Apply causal mask
+        S = k.size(2)  # Total sequence length (including cache)
+        causal_mask = torch.triu(torch.ones(T, S, device=device, dtype=torch.bool), diagonal=S - T + 1)
+        attn_scores = attn_scores.masked_fill(causal_mask, float("-inf"))
 
         if attn_mask is not None:
             attn_scores = attn_scores.masked_fill(~attn_mask, float("-inf"))

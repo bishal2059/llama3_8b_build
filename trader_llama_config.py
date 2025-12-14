@@ -1,3 +1,6 @@
+import json
+
+
 class TraderLlamaConfig:
     def __init__(self, 
         model_name: str ="trader-llama-base",
@@ -39,3 +42,25 @@ class TraderLlamaConfig:
         self.tie_word_embeddings = tie_word_embeddings
         self.use_cache = use_cache
         self.training = training
+
+    @classmethod
+    def from_json(cls, config_path: str) -> "TraderLlamaConfig":
+        """Load config from a JSON file."""
+        with open(config_path, "r") as f:
+            config_dict = json.load(f)
+        
+        # Map HuggingFace config keys to our config keys if needed
+        key_mapping = {
+            "hidden_act": "hidden_activation",
+        }
+        
+        mapped_dict = {}
+        for key, value in config_dict.items():
+            mapped_key = key_mapping.get(key, key)
+            mapped_dict[mapped_key] = value
+        
+        # Filter to only valid config parameters
+        valid_keys = cls.__init__.__code__.co_varnames[1:]  # Skip 'self'
+        filtered_dict = {k: v for k, v in mapped_dict.items() if k in valid_keys}
+        
+        return cls(**filtered_dict)
