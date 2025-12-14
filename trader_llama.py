@@ -1,6 +1,7 @@
 from trader_llama_config import TraderLlamaConfig
 from trader_llama_layer import TraderLlamaLayer
 from trader_llama_rms_norm import TraderLlamaRMSNorm
+from trader_llama_rotary_embedding import TraderLlamaRotaryEmbedding
 import torch
 import torch.nn as nn
 
@@ -17,7 +18,9 @@ class TraderLlama(nn.Module):
         # Final layer norm
         self.norm = TraderLlamaRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
 
-        self.rotary_emb = RotaryEmbedding(config.hidden_size // config.num_attention_heads)
+        self.rotary_emb = TraderLlamaRotaryEmbedding(config.hidden_size // config.num_attention_heads, 
+                                                     max_position_embeddings=config.max_position_embeddings,
+                                                     base=config.rope_theta)
 
 
     def forward(self, input_ids):

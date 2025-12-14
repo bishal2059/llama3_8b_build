@@ -3,6 +3,16 @@ from trader_llama_rms_norm import TraderLlamaRMSNorm
 import torch
 import torch.nn as nn
 
+def rotate_half(x):
+    x1 = x[..., : x.shape[-1] // 2]
+    x2 = x[..., x.shape[-1] // 2 :]
+    return torch.cat((-x2, x1), dim=-1)
+
+def apply_rotary_pos_emb(q, k, cos, sin):
+ 
+    q_embed = (q * cos) + (rotate_half(q) * sin)
+    k_embed = (k * cos) + (rotate_half(k) * sin)
+    return q_embed, k_embed
 
 class TraderLlamaLayer(nn.Module):
     def __init__(self, config: TraderLlamaConfig):
@@ -16,11 +26,11 @@ class TraderLlamaLayer(nn.Module):
     def forward(self, x, rotary_emb):
         # Attention block
         normed_x = self.input_layernorm(x)
-        attn_output = self.attention(normed_x, rotary_emb)
+        attn_output = self.self_attn(normed_x, rotary_emb)
         x = x + attn_output
 
         # MLP block
-        normed_x = self.post_attention_norm(x)
+        normed_x = self.post_attention_layernorm(x)
         mlp_output = self.mlp(normed_x)
         x = x + mlp_output
 
@@ -41,3 +51,4 @@ class TraderLlamaMLP(nn.Module):
         gate_output = self.gate_proj(x)
         up_proj_output = self.up_proj_proj(x)
         return self.down_proj(self.act_fn(gate_output) * up_proj_output)
+    

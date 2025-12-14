@@ -15,6 +15,8 @@ class TraderLlamaConfig:
         num_key_value_heads: int = 8,
         rms_norm_eps: float = 1e-05,
         vocab_size: int = 128256,
+        rope_theta: float = 500000.0,
+        tie_word_embeddings: bool = True,
         ):
         self.model_name = model_name
         self.attention_bias = attention_bias
@@ -31,3 +33,5 @@ class TraderLlamaConfig:
         self.num_key_value_heads = num_key_value_heads
         self.rms_norm_eps = rms_norm_eps
         self.vocab_size = vocab_size
+        self.rope_theta = rope_theta
+        self.tie_word_embeddings = tie_word_embeddings
