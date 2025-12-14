@@ -66,5 +66,30 @@ class TraderLlama(nn.Module):
 
         return x, new_past_key_values
 
+
+# TraderLlama for causal language modeling
+class TraderLlamaForCausalLM(nn.Module):
+    def __init__(self, config: TraderLlamaConfig):
+        super().__init__()
+        self.trader_llama = TraderLlama(config)
+        self.lm_head = nn.Linear(
+            config.hidden_size, config.vocab_size, bias=False
+        )
+
+    def forward(
+        self,
+        input_ids,
+        past_key_values=None,
+        use_cache=False,
+    ):
+        hidden_states, new_past_key_values = self.trader_llama(
+            input_ids,
+            past_key_values=past_key_values,
+            use_cache=use_cache,
+        )
+
+        logits = self.lm_head(hidden_states)
+
+        return logits, new_past_key_values
         
 
