@@ -1,8 +1,10 @@
 from trader_llama_config import TraderLlamaConfig
 from trader_llama_rms_norm import TraderLlamaRMSNorm
+from trader_llama_rotary_embedding import TraderLlamaRotaryEmbedding
 import math
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from dataclasses import dataclass
 
 @dataclass
@@ -16,15 +18,15 @@ class KVCache:
 
 
 def rotate_half(x):
-    x1 = x[..., : x.shape[-1] // 2]
-    x2 = x[..., x.shape[-1] // 2 :]
-    return torch.cat((-x2, x1), dim=-1)
+    x1, x2 = x[..., : x.shape[-1] // 2], x[..., x.shape[-1] // 2 :]
+    return torch.cat([-x2, x1], dim=-1)
 
-def apply_rotary_pos_emb(q, k, cos, sin):
- 
-    q_embed = (q * cos) + (rotate_half(q) * sin)
-    k_embed = (k * cos) + (rotate_half(k) * sin)
-    return q_embed, k_embed
+
+def apply_rotary(q, k, sin, cos):
+    return (
+        (q * cos) + rotate_half(q) * sin,
+        (k * cos) + rotate_half(k) * sin,
+    )
 
 class TraderLlamaLayer(nn.Module):
     def __init__(self, config: TraderLlamaConfig):
@@ -35,10 +37,10 @@ class TraderLlamaLayer(nn.Module):
         self.input_layernorm = TraderLlamaRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.post_attention_layernorm = TraderLlamaRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
 
-    def forward(self, x, rotary_emb):
+    def forward(self, x, rotary_emb, past_key_value=None, use_cache=False):
         # Attention block
         normed_x = self.input_layernorm(x)
-        attn_output = self.self_attn(normed_x, rotary_emb)
+        attn_output, new_past_key_value = self.self_attn(normed_x, rotary_emb,  kv_cache = past_key_value, use_cache=use_cache)
         x = x + attn_output
 
         # MLP block
@@ -46,7 +48,7 @@ class TraderLlamaLayer(nn.Module):
         mlp_output = self.mlp(normed_x)
         x = x + mlp_output
 
-        return x
+        return x , new_past_key_value
     
 class TraderLlamaMLP(nn.Module):
     def __init__(self, config: TraderLlamaConfig):
@@ -74,6 +76,9 @@ class TraderLlamaAttention(nn.Module):
         assert (self.head_dim * self.num_heads == self.embed_dim), "embed_dim must be divisible by num_heads"
         self.scale = 1 / (self.head_dim ** 0.5)
         self.num_kv_heads = config.num_key_value_heads
+        self.rotary_dim = config.rotary_dim if config.rotary_dim > 0 else self.head_dim
+        self.dropout = config.attention_dropout
+        self.training = config.training
 
         self.q_proj = nn.Linear(self.embed_dim, self.embed_dim, bias=False)
         self.k_proj = nn.Linear(self.embed_dim, self.num_kv_heads * self.head_dim, bias=False)
@@ -84,7 +89,8 @@ class TraderLlamaAttention(nn.Module):
         self,
         x,
         attn_mask=None,
-        kv_cache: KVCache | None = None,
+        rotary_emb: TraderLlamaRotaryEmbedding = None,
+        kv_cache = None,
         use_cache: bool = False,
     ):
         """
@@ -109,7 +115,7 @@ class TraderLlamaAttention(nn.Module):
         # ---- Rotary embeddings ----
         if self.rotary_dim > 0:
             past_len = kv_cache.seq_len if kv_cache is not None else 0
-            sin, cos = self.rotary.get_sin_cos(past_len + T, device)
+            sin, cos = rotary_emb.get_sin_cos(past_len + T, device)
 
             sin = sin[:, :, past_len:, :]
             cos = cos[:, :, past_len:, :]
@@ -149,7 +155,7 @@ class TraderLlamaAttention(nn.Module):
 
         # ---- Merge heads ----
         out = out.transpose(1, 2).reshape(B, T, self.embed_dim)
-        out = self.out_proj(out)
+        out = self.o_proj(out)
 
         return out, new_cache
 

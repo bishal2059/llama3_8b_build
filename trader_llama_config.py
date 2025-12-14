@@ -17,6 +17,8 @@ class TraderLlamaConfig:
         vocab_size: int = 128256,
         rope_theta: float = 500000.0,
         tie_word_embeddings: bool = True,
+        use_cache: bool = True,
+        training: bool = False
         ):
         self.model_name = model_name
         self.attention_bias = attention_bias
@@ -35,3 +37,5 @@ class TraderLlamaConfig:
         self.vocab_size = vocab_size
         self.rope_theta = rope_theta
         self.tie_word_embeddings = tie_word_embeddings
+        self.use_cache = use_cache
+        self.training = training
